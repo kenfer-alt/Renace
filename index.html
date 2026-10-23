@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0F9D8A">
+<title>Renace</title>
+<style>
+  :root {
+    --fondo: #f6f8f9; --panel: #ffffff; --texto: #1b2a2f; --suave: #5f7279; --borde: #e1e8ea;
+    --marca: #0f9d8a; --marca-osc: #0b7d6e; --usuario: #0f9d8a; --usuario-txt: #ffffff; --burbuja: #ffffff;
+    --rojo: #d64545; --naranja: #e8872b; --amarillo: #d9a81a; --verde: #1fa463; --sombra: 0 2px 10px rgba(20,50,60,.08);
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --fondo: #0f1517; --panel: #172024; --texto: #e6eef0; --suave: #93a6ac; --borde: #263439; --burbuja: #172024; --sombra: 0 2px 10px rgba(0,0,0,.35); }
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; margin: 0; }
+  body { background: var(--fondo); color: var(--texto); font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; font-size: 16px; overflow: hidden; }
+  button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+  #app { height: 100%; display: flex; flex-direction: column; padding-top: env(safe-area-inset-top, 0); }
+
+  /* ---- barra superior ---- */
+  #barra { display: flex; align-items: center; gap: 6px; padding: 8px 10px; background: var(--panel); border-bottom: 1px solid var(--borde); }
+  #barra .icono { font-size: 22px; width: 42px; height: 42px; border-radius: 12px; }
+  #barra .icono:active { background: var(--fondo); }
+  #tituloChat { flex: 1; font-weight: 700; font-size: 17px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center; }
+
+  /* ---- lista de chats (cajón) ---- */
+  #velo { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 40; display: none; }
+  #cajon { position: fixed; top: 0; bottom: 0; left: 0; width: min(86vw, 340px); background: var(--panel); z-index: 41; transform: translateX(-102%); transition: transform .22s ease; display: flex; flex-direction: column; padding-top: env(safe-area-inset-top, 0); box-shadow: var(--sombra); }
+  #cajon.abierto { transform: none; }
+  #cajon .cab { padding: 14px 14px 8px; display: flex; align-items: center; justify-content: space-between; }
+  #cajon .cab b { font-size: 20px; color: var(--marca); }
+  #nuevoChat { background: var(--marca); color: #fff; padding: 9px 14px; border-radius: 12px; font-weight: 600; }
+  #buscarChats { margin: 4px 14px 8px; padding: 11px 13px; border-radius: 12px; border: 1px solid var(--borde); background: var(--fondo); color: var(--texto); font: inherit; }
+  #listaChats { flex: 1; overflow-y: auto; padding: 0 8px; }
+  .chat-item { display: flex; align-items: center; gap: 4px; padding: 11px 10px; border-radius: 12px; }
+  .chat-item.activo { background: color-mix(in srgb, var(--marca) 14%, transparent); }
+  .chat-item .info { flex: 1; min-width: 0; text-align: left; }
+  .chat-item .t { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .chat-item .s { font-size: 12.5px; color: var(--suave); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .chat-item .mas { width: 34px; height: 34px; border-radius: 10px; color: var(--suave); font-size: 18px; }
+  #cajon .pie { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; padding: 10px 14px calc(12px + env(safe-area-inset-bottom, 0)); border-top: 1px solid var(--borde); }
+  #cajon .pie button { padding: 12px 8px; border-radius: 12px; background: var(--fondo); font-weight: 600; font-size: 14.5px; }
+
+  /* ---- mensajes ---- */
+  #mensajes { flex: 1; overflow-y: auto; padding: 14px 12px 8px; display: flex; flex-direction: column; gap: 12px; scroll-behavior: smooth; }
+  .fila { display: flex; flex-direction: column; max-width: 94%; gap: 6px; }
+  .fila.usuario { align-self: flex-end; align-items: flex-end; }
+  .fila.bot { align-self: flex-start; }
+  .burbuja { padding: 11px 14px; border-radius: 18px; line-height: 1.5; word-wrap: break-word; overflow-wrap: anywhere; box-shadow: var(--sombra); }
+  .usuario .burbuja { background: var(--usuario); color: var(--usuario-txt); border-bottom-right-radius: 6px; white-space: pre-wrap; }
+  .bot .burbuja { background: var(--burbuja); border-bottom-left-radius: 6px; border: 1px solid var(--borde); }
+  .bot .burbuja p { margin: 0 0 6px; } .bot .burbuja p:last-child { margin: 0; }
+  .acciones-msg { display: flex; gap: 4px; }
+  .acciones-msg button { font-size: 12.5px; color: var(--suave); padding: 3px 8px; border-radius: 8px; }
+  .pensando { color: var(--suave); font-style: italic; }
+
+  /* ---- tarjetas dentro de los mensajes ---- */
+  .caja { background: var(--panel); border: 1px solid var(--borde); border-radius: 16px; padding: 14px; box-shadow: var(--sombra); width: 100%; }
+  .caja h3 { margin: 0 0 8px; font-size: 16px; }
+  .grande { font-size: 28px; font-weight: 800; letter-spacing: -.5px; }
+  .suave { color: var(--suave); font-size: 13.5px; }
+  .barra { height: 22px; border-radius: 11px; background: color-mix(in srgb, var(--suave) 22%, transparent); overflow: hidden; margin: 10px 0 6px; }
+  .barra > div { height: 100%; border-radius: 11px; transition: width .5s; }
+  .semaforo { display: inline-block; padding: 3px 10px; border-radius: 999px; color: #fff; font-weight: 700; font-size: 13px; }
+  .btn { background: var(--marca); color: #fff; padding: 11px 16px; border-radius: 12px; font-weight: 700; margin: 6px 6px 0 0; }
+  .btn.sec { background: var(--fondo); color: var(--texto); border: 1px solid var(--borde); }
+  .btn.peligro { background: var(--rojo); }
+  .btn.chico { padding: 7px 12px; font-size: 14px; }
+  .btn:disabled { opacity: .45; }
+  .fila-arch { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center; padding: 10px 0; border-top: 1px solid var(--borde); }
+  .fila-arch .acc { display: flex; gap: 6px; width: 100%; flex-wrap: wrap; }
+  .fila-arch:first-of-type { border-top: 0; }
+  .fila-arch .mini { width: 46px; height: 46px; border-radius: 10px; background: var(--fondo); display: flex; align-items: center; justify-content: center; font-size: 24px; overflow: hidden; flex: none; }
+  .fila-arch .mini img { width: 100%; height: 100%; object-fit: cover; }
+  .fila-arch .dat { flex: 1 1 55%; min-width: 0; }
+  .fila-arch .n { font-weight: 600; overflow-wrap: anywhere; }
+  .fila-arch .ruta { font-size: 12.5px; color: var(--suave); overflow-wrap: anywhere; }
+  .ficha { background: var(--fondo); border-radius: 12px; padding: 10px 12px; margin: 8px 0; font-size: 14.5px; }
+  .aviso-imp { background: color-mix(in srgb, var(--rojo) 14%, transparent); border: 1px solid var(--rojo); border-radius: 12px; padding: 10px 12px; margin: 8px 0; font-size: 14.5px; }
+  .progreso-t { font-size: 13px; color: var(--suave); margin-bottom: 4px; }
+  details.analisis { font-size: 13px; color: var(--suave); background: var(--panel); border: 1px solid var(--borde); border-radius: 12px; padding: 8px 12px; }
+  details.analisis summary { cursor: pointer; font-weight: 600; }
+  .chip { display: inline-block; padding: 2px 8px; margin: 2px 3px 2px 0; border-radius: 8px; background: var(--fondo); border: 1px solid var(--borde); }
+  .chip small { color: var(--suave); }
+  .grupo-dup { border: 1px solid var(--borde); border-radius: 14px; padding: 4px 12px; margin: 10px 0; }
+
+  /* ---- entrada ---- */
+  #entradaWrap { padding: 8px 10px calc(10px + env(safe-area-inset-bottom, 0)); background: var(--fondo); }
+  #entradaCaja { display: flex; align-items: flex-end; gap: 6px; background: var(--panel); border: 1px solid var(--borde); border-radius: 26px; padding: 6px 6px 6px 16px; box-shadow: var(--sombra); }
+  #entrada { flex: 1; border: 0; outline: 0; resize: none; background: transparent; color: var(--texto); font: inherit; max-height: 130px; padding: 9px 0; line-height: 1.4; }
+  #entradaCaja button { width: 44px; height: 44px; border-radius: 50%; font-size: 20px; flex: none; }
+  #micBtn { background: var(--fondo); }
+  #enviarBtn { background: var(--marca); color: #fff; }
+  #enviarBtn:disabled { opacity: .4; }
+  .sugerencias { display: flex; gap: 6px; overflow-x: auto; padding: 0 2px 8px; }
+  .sugerencias button { white-space: nowrap; padding: 8px 12px; border-radius: 999px; background: var(--panel); border: 1px solid var(--borde); font-size: 14px; }
+
+  /* ---- ventanas ---- */
+  #modalVelo { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 60; display: none; align-items: center; justify-content: center; padding: 20px; }
+  #modal { background: var(--panel); border-radius: 18px; padding: 18px; width: min(100%, 380px); box-shadow: var(--sombra); }
+  #modal h3 { margin: 0 0 8px; } #modal p { margin: 0 0 12px; color: var(--suave); line-height: 1.45; white-space: pre-line; }
+  #modal input { width: 100%; padding: 12px; border-radius: 12px; border: 1px solid var(--borde); background: var(--fondo); color: var(--texto); font: inherit; margin-bottom: 12px; }
+  #modal .botones { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+  #ajustes { position: fixed; inset: 0; background: var(--fondo); z-index: 50; display: none; flex-direction: column; padding-top: env(safe-area-inset-top, 0); }
+  #ajustes .cuerpo { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+  #ajustes input[type=range] { width: 100%; accent-color: var(--marca); }
+  #toast { position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%); background: #1b2a2f; color: #fff; padding: 10px 16px; border-radius: 12px; z-index: 70; display: none; max-width: 86vw; text-align: center; font-size: 14.5px; }
+  .vacio { text-align: center; color: var(--suave); padding: 24px 12px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="barra">
+    <button class="icono" id="menuBtn" aria-label="Chats">☰</button>
+    <div id="tituloChat">Renace</div>
+    <button class="icono" id="chatMenuBtn" aria-label="Opciones del chat">⋯</button>
+  </div>
+  <div id="mensajes"></div>
+  <div id="entradaWrap">
+    <div class="sugerencias" id="sugerencias"></div>
+    <div id="entradaCaja">
+      <textarea id="entrada" rows="1" placeholder="Pídeme algo: «¿cuánto espacio me queda?»"></textarea>
+      <button id="micBtn" aria-label="Hablar">🎤</button>
+      <button id="enviarBtn" aria-label="Enviar" disabled>➤</button>
+    </div>
+  </div>
+</div>
+
+<div id="velo"></div>
+<aside id="cajon">
+  <div class="cab"><b>🌱 Renace</b><button id="nuevoChat">＋ Nuevo chat</button></div>
+  <input id="buscarChats" type="search" placeholder="Buscar en tus chats...">
+  <div id="listaChats"></div>
+  <div class="pie">
+    <button data-atajo="espacio">💾 Espacio</button>
+    <button data-atajo="apps">📲 Apps sin usar</button>
+    <button data-atajo="papelera">🗑️ Papelera</button>
+    <button data-atajo="ajustes">⚙️ Ajustes</button>
+  </div>
+</aside>
+
+<section id="ajustes">
+  <div id="barra" style="border-bottom:1px solid var(--borde)">
+    <button class="icono" id="ajustesCerrar" aria-label="Volver">←</button>
+    <div id="tituloAjustes" style="flex:1;font-weight:700;text-align:center">Ajustes</div>
+    <span style="width:42px"></span>
+  </div>
+  <div class="cuerpo" id="ajustesCuerpo"></div>
+</section>
+
+<div id="modalVelo"><div id="modal"></div></div>
+<div id="toast"></div>
+
+<script src="js/almacen.js"></script>
+<script src="js/utiles.js"></script>
+<script src="js/nativo.js"></script>
+<script src="js/analisis.js"></script>
+<script src="js/resumen.js"></script>
+<script src="js/asistente.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
